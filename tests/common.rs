@@ -1,4 +1,4 @@
-use merkle_tree::*;
+use tiny_merkle::*;
 
 use hex_literal::hex;
 use sha2::{Digest, Sha256, Sha384, Sha512};

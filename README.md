@@ -33,12 +33,12 @@ tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 Construct tree, generate proof, and verify proof:
 
 ```rust
-use merkle_tree::MerkleTree;
+use tiny_merkle::MerkleTree;
 use tiny_keccak::{Hasher, Keccak};
 
 #[derive(Clone, Debug)]
 pub struct KeccakHasher;
-impl merkle_tree::Hasher for KeccakHasher {
+impl tiny_merkle::Hasher for KeccakHasher {
 	type Hash = [u8; 32];
 
 	fn hash(&self, value: &[u8]) -> Self::Hash {
@@ -68,7 +68,7 @@ fn main() {
 	let tree = MerkleTree::new(
 		KeccakHasher,
 		leaves.clone(),
-		Some(merkle_tree::MerkleOptions {
+		Some(tiny_merkle::MerkleOptions {
 			min_tree_size: None,
 			hash_leaves: None,
 			sort_leaves: None,

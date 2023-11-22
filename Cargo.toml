@@ -1,10 +1,10 @@
 [package]
-name = "merkle-tree"
+name = "tiny-merkle"
 version = "0.1.0"
 edition = "2021"
 description =  "A tiny merkle tree library for Ethereum"
 license = "MIT"
-authors = ["merkle-tree Developers"]
+authors = ["tiny-merkle Developers"]
 repository = "https://github.com/chiaos/merkletree"
 readme = "README.md"
 resolver = "2"

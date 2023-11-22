@@ -5,13 +5,13 @@
 //! ## Usage
 //!
 //! ```rust
-//! use merkle_tree::MerkleTree;
+//! use tiny_merkle::MerkleTree;
 //! use tiny_keccak::{ Keccak, Hasher};
 //!
 //!
 //! #[derive(Clone, Debug)]
 //! pub struct KeccakHasher;
-//! impl merkle_tree::Hasher for KeccakHasher {
+//! impl tiny_merkle::Hasher for KeccakHasher {
 //!     type Hash = [u8; 32];
 //!
 //!     fn hash(&self, value: &[u8]) -> Self::Hash {
@@ -28,7 +28,7 @@
 //! }
 //!
 //! let leaves = vec!["a", "b", "c", "d", "e", "f"].iter().map(|x| keccak256(x.as_bytes())).collect::<Vec<_>>();
-//! let mtree = merkle_tree::MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
+//! let mtree = tiny_merkle::MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
 //! let root = mtree.root();
 //!
 //! // verify the proof of the first leaf

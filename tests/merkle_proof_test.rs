@@ -3,7 +3,7 @@ mod common;
 mod proof {
 
 	use hex_literal::hex;
-	use merkle_tree::*;
+	use tiny_merkle::*;
 
 	use tiny_keccak::{Hasher, Keccak};
 
@@ -17,7 +17,7 @@ mod proof {
 
 	#[derive(Clone, Debug)]
 	pub struct KeccakHasher;
-	impl merkle_tree::Hasher for KeccakHasher {
+	impl tiny_merkle::Hasher for KeccakHasher {
 		type Hash = [u8; 32];
 
 		fn hash(&self, value: &[u8]) -> Self::Hash {
@@ -1602,7 +1602,7 @@ mod proof {
 	];
 
 	// fn merkle_proof_from_vec<H>(leaf_hashes: Vec<H::Hash>) -> MerkleProof<H>
-	//     where H: merkle_tree::Hasher
+	//     where H: tiny_merkle::Hasher
 	// {
 
 	//     MerkleProof {
