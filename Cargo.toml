@@ -1,0 +1,23 @@
+[package]
+name = "merkle-tree"
+version = "0.1.0"
+edition = "2021"
+description =  "A tiny merkle tree library for Ethereum"
+license = "MIT"
+authors = ["merkle-tree Developers"]
+repository = "https://github.com/chiaos/merkletree"
+readme = "README.md"
+resolver = "2"
+categories = ["cryptography", "merkle-tree", "ethereum", "merkle"]
+
+
+
+[dependencies]
+
+
+
+[dev-dependencies]
+tiny-keccak = { version = "2.0.2", features = ["sha3","keccak"] }
+sha2 = "0.10.8"
+hex-literal = "0.4"
+hex = "0.4.3"
