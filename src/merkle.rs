@@ -4,6 +4,7 @@ use crate::hash::Hasher;
 /// we unlikely to ever hit.
 const MAX_TREE_DEPTH: usize = 32;
 
+#[derive(Debug, Clone, Default)]
 pub struct MerkleOptions {
 	pub min_tree_size: Option<usize>,
 	/// If set to `true`, the leaves will hashed using the set hashing algorithms.
@@ -15,6 +16,37 @@ pub struct MerkleOptions {
 
 	/// If `true`, sort_pairs is set to `true` and sort_pairs is set to `true`.
 	pub sort: Option<bool>,
+}
+
+impl MerkleOptions {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	pub fn with_min_tree_size(mut self, min_tree_size: usize) -> Self {
+		self.min_tree_size = Some(min_tree_size);
+		self
+	}
+
+	pub fn with_hash_leaves(mut self, hash_leaves: bool) -> Self {
+		self.hash_leaves = Some(hash_leaves);
+		self
+	}
+
+	pub fn with_sort_leaves(mut self, sort_leaves: bool) -> Self {
+		self.sort_leaves = Some(sort_leaves);
+		self
+	}
+
+	pub fn with_sort_pairs(mut self, sort_pairs: bool) -> Self {
+		self.sort_pairs = Some(sort_pairs);
+		self
+	}
+
+	pub fn with_sort(mut self, sort: bool) -> Self {
+		self.sort = Some(sort);
+		self
+	}
 }
 
 #[allow(dead_code)]
@@ -117,16 +149,16 @@ where
 		}
 	}
 
-	pub fn proof(&self, leaf: &[u8]) -> Option<Vec<MerkleProof<H>>> {
-		let index = self.hashes.iter().position(|x| x.as_ref() == leaf)?;
+	pub fn proof<T: AsRef<[u8]>>(&self, leaf: T) -> Option<Vec<MerkleProof<H>>> {
+		let index = self.hashes.iter().position(|x| x.as_ref() == leaf.as_ref())?;
 
 		let mut merkle_path = vec![];
 		let _ = self.compute(index, Some(&mut merkle_path));
 		Some(merkle_path)
 	}
 
-	pub fn verify(&self, leaf: &[u8], root: &[u8], proof: &[MerkleProof<H>]) -> bool {
-		let mut hash = leaf.to_vec();
+	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &[MerkleProof<H>]) -> bool {
+		let mut hash = leaf.as_ref().to_vec();
 		for p in proof {
 			if self.sort_pairs {
 				let mut v = vec![hash.clone(), p.data.as_ref().to_vec()];
@@ -144,7 +176,7 @@ where
 				hash = self.hasher.hash(combine.as_ref()).as_ref().to_vec();
 			}
 		}
-		hash == root
+		hash == root.as_ref()
 	}
 
 	/// Returns the root hash and the Merkle proof for a leaf with the specified 0-based `index`.

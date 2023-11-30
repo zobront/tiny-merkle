@@ -67,11 +67,8 @@ fn main() {
 		KeccakHasher,
 		leaves.clone(),
 		Some(MerkleOptions {
-			min_tree_size: None,
-			hash_leaves: None,
-			sort_leaves: None,
-			sort_pairs: None,
 			sort: Some(true),
+			..Default::default()
 		}),
 	);
 
@@ -89,17 +86,7 @@ fn main_readme() {
 
 	let leaves = data_raw.iter().map(|s| keccak256(&s.as_bytes())).collect::<Vec<_>>();
 
-	let tree = MerkleTree::new(
-		KeccakHasher,
-		leaves.clone(),
-		Some(tiny_merkle::MerkleOptions {
-			min_tree_size: None,
-			hash_leaves: None,
-			sort_leaves: None,
-			sort_pairs: None,
-			sort: Some(true),
-		}),
-	);
+	let tree = MerkleTree::new(KeccakHasher, leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
 
 	println!("root: {}", hex::encode(tree.root()));
 

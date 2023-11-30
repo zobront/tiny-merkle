@@ -59,21 +59,15 @@ fn main() {
 
 	let leaves = data_raw
 		.iter()
-		.map(|s| {
-            
-			keccak256(&s.as_bytes())
-		})
+		.map(|s| keccak256(&s.as_bytes()))
 		.collect::<Vec<_>>();
 
 	let tree = MerkleTree::new(
 		KeccakHasher,
 		leaves.clone(),
 		Some(tiny_merkle::MerkleOptions {
-			min_tree_size: None,
-			hash_leaves: None,
-			sort_leaves: None,
-			sort_pairs: None,
 			sort: Some(true),
+			..Default::default()
 		}),
 	);
 

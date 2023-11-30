@@ -44,7 +44,7 @@ fn sha256_root_and_proof() {
 	for (i, leaf) in leaf_hashes.iter().enumerate() {
 		let proof = tree.proof(leaf).expect("Failed to generate proof");
 		assert!(
-			tree.verify(leaf, tree.root().as_ref(), &proof),
+			tree.verify(leaf, &tree.root(), &proof),
 			"Failed to verify proof, leaf: {:?}, value: {:?}",
 			hex::encode(leaf),
 			leaf_values[i]
@@ -78,7 +78,7 @@ macro_rules! test_sha2_case {
 			for (i, leaf) in leaf_hashes.iter().enumerate() {
 				let proof = tree.proof(leaf).expect("Failed to generate proof");
 				assert!(
-					tree.verify(leaf, root.as_ref(), &proof),
+					tree.verify(leaf, &root, &proof),
 					"Failed to verify proof, leaf: {:?}, value: {:?}",
 					hex::encode(leaf),
 					leaf_values[i]
