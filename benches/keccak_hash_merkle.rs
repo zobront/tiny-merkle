@@ -22,14 +22,16 @@ fn keccak256(data: &[u8]) -> [u8; 32] {
 	hash
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(benches, merkle_proof_benchmark);
 criterion_main!(benches);
 
-fn criterion_benchmark(c: &mut Criterion) {
-	let leaves = vec!["a", "b", "c", "d", "e", "f"]
-		.iter()
-		.map(|x| keccak256(x.as_bytes()))
-		.collect::<Vec<_>>();
+fn merkle_proof_benchmark(c: &mut Criterion) {
+	let leaves = vec![
+		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+	]
+	.iter()
+	.map(|x| keccak256(x.as_bytes()))
+	.collect::<Vec<_>>();
 	let mtree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
 	let root = mtree.root();
 
@@ -38,5 +40,5 @@ fn criterion_benchmark(c: &mut Criterion) {
 	let proof = mtree.proof(&leaf).unwrap();
 	assert!(mtree.verify(&leaf, &root, &proof));
 
-	c.bench_function("merkle tree", |b| b.iter(|| mtree.proof(black_box(&leaf))));
+	c.bench_function("merkle proof", |b| b.iter(|| mtree.proof(black_box(&leaf))));
 }

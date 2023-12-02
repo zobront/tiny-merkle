@@ -7,6 +7,7 @@ const MAX_TREE_DEPTH: usize = 32;
 /// Merkle tree options.
 #[derive(Debug, Clone, Default)]
 pub struct MerkleOptions {
+	/// If set, the tree will be padded to this size with zero hashes.
 	pub min_tree_size: Option<usize>,
 	/// If set to `true`, the leaves will hashed using the set hashing algorithms.
 	pub hash_leaves: Option<bool>,
@@ -58,8 +59,9 @@ where
 	H: Hasher,
 {
 	hasher: H,
-	hashes: Vec<H::Hash>,
-	binary_tree_size: usize,
+	layers: Vec<Vec<H::Hash>>,
+	leaves_count: usize,
+	high: usize,
 	hash_leaves: bool,
 	sort_leaves: bool,
 	sort_pairs: bool,
@@ -76,8 +78,8 @@ pub enum Position {
 impl std::fmt::Display for Position {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Position::Left => write!(f, "left"),
-			Position::Right => write!(f, "right"),
+			Position::Left => write!(f, "Left"),
+			Position::Right => write!(f, "Right"),
 		}
 	}
 }
@@ -120,21 +122,24 @@ where
 			hashes.sort();
 		}
 
-		let mut binary_tree_size = hashes.len().next_power_of_two();
+		let mut high = hashes.len().next_power_of_two();
 		if let Some(min_tree_size) = min_tree_size {
 			assert!(min_tree_size.is_power_of_two(), "tree size must be a power of 2");
-			binary_tree_size = min_tree_size.max(binary_tree_size);
+			high = min_tree_size.max(high);
 		}
 		assert!(
-			tree_depth_by_size(binary_tree_size) <= MAX_TREE_DEPTH,
+			tree_depth_by_size(high) <= MAX_TREE_DEPTH,
 			"Tree contains more than {} items; this is not supported",
 			1 << MAX_TREE_DEPTH
 		);
+		let leaves_count = hashes.len();
+		let layers = Self::build(&hasher, hashes, sort_pairs);
 
 		Self {
 			hasher,
-			hashes,
-			binary_tree_size,
+			leaves_count,
+			layers,
+			high,
 			hash_leaves,
 			sort_leaves,
 			sort_pairs,
@@ -146,19 +151,28 @@ where
 	/// # Panics
 	/// Will panic if the constant below is invalid.
 	pub fn root(&self) -> H::Hash {
-		if self.hashes.is_empty() {
+		if self.layers.is_empty() {
 			panic!("merkle root of empty tree is not defined");
 		} else {
-			self.compute(0, None)
+			self.layers.last().unwrap()[0].clone()
 		}
 	}
 
 	pub fn proof<T: AsRef<[u8]>>(&self, leaf: T) -> Option<Vec<MerkleProof<H>>> {
-		let index = self.hashes.iter().position(|x| x.as_ref() == leaf.as_ref())?;
+		if self.layers.is_empty()
+		/* || self.layers[0].is_empty() */
+		{
+			return None;
+		}
 
-		let mut merkle_path = vec![];
-		let _ = self.compute(index, Some(&mut merkle_path));
-		Some(merkle_path)
+		let index = if self.sort_leaves {
+			self.layers[0].binary_search_by(|probe| probe.as_ref().cmp(leaf.as_ref())).ok()?
+		} else {
+			self.layers[0].iter().position(|x| x.as_ref() == leaf.as_ref())?
+		};
+
+		let proof = self.make_proof(index);
+		Some(proof)
 	}
 
 	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &[MerkleProof<H>]) -> bool {
@@ -183,54 +197,57 @@ where
 		hash == root.as_ref()
 	}
 
-	/// Returns the root hash and the Merkle proof for a leaf with the specified 0-based `index`.
-	#[allow(dead_code)]
-	fn merkle_root_and_path(&self, index: usize) -> (H::Hash, Vec<MerkleProof<H>>) {
+	fn make_proof(&self, index: usize) -> Vec<MerkleProof<H>> {
+		// let binary_tree_size = hashes.len().next_power_of_two();
+		let depth = tree_depth_by_size(self.high);
 		let mut merkle_path = vec![];
-		let root_hash = self.compute(index, Some(&mut merkle_path));
-		(root_hash, merkle_path)
-	}
+		let mut level_len = self.leaves_count;
+		let mut index: usize = index;
+		for level in 0..depth {
+			let adjacent_idx = index ^ 1;
+			if adjacent_idx < level_len {
+				let p = MerkleProof {
+					data: self.layers[level][adjacent_idx].clone(),
+					position: if adjacent_idx <= index { Position::Left } else { Position::Right },
+				};
 
-	fn compute(&self, mut index: usize, mut merkle_path: Option<&mut Vec<MerkleProof<H>>>) -> H::Hash {
-		assert!(index < self.hashes.len(), "invalid tree leaf index");
-
-		let depth = tree_depth_by_size(self.binary_tree_size);
-		if let Some(merkle_path) = merkle_path.as_deref_mut() {
-			merkle_path.reserve(depth);
+				merkle_path.push(p);
+			}
+			index /= 2;
+			level_len = level_len / 2 + level_len % 2;
 		}
 
-		let mut hashes = self.hashes.clone();
+		merkle_path
+	}
+
+	fn build(hasher: &H, leaves: Vec<H::Hash>, sort_pairs: bool) -> Vec<Vec<H::Hash>> {
+		let binary_tree_size = leaves.len().next_power_of_two();
+		let depth = tree_depth_by_size(binary_tree_size);
+		let mut layers = vec![];
+		let mut hashes: Vec<H::Hash> = leaves.clone();
 		let mut level_len = hashes.len();
+		layers.push(leaves);
+
 		for _level in 0..depth {
-			if let Some(merkle_path) = merkle_path.as_deref_mut() {
-				let adjacent_idx = index ^ 1;
-				if adjacent_idx < level_len {
-					let p = MerkleProof {
-						data: hashes[adjacent_idx].clone(),
-						position: if adjacent_idx <= index { Position::Left } else { Position::Right },
-					};
-
-					merkle_path.push(p);
-				}
-			}
-
 			for i in 0..(level_len / 2) {
-				if self.sort_pairs {
+				if sort_pairs {
 					hashes[2 * i..2 * i + 2].sort();
 				}
 				// combine hashes[2 * i], &hashes[2 * i + 1]
 				let mut combine = hashes[2 * i].as_ref().to_vec();
 				combine.extend(hashes[2 * i + 1].as_ref());
-				hashes[i] = self.hasher.hash(combine.as_ref());
+				hashes[i] = hasher.hash(combine.as_ref());
 			}
 			if level_len % 2 == 1 {
 				hashes[level_len / 2] = hashes[level_len - 1].clone();
 			}
 
-			index /= 2;
 			level_len = level_len / 2 + level_len % 2;
+			layers.push(hashes[..level_len].to_vec());
 		}
-		hashes[0].clone()
+		let root = hashes[0].clone();
+		layers.push(vec![root]);
+		layers
 	}
 }
 
@@ -329,7 +346,7 @@ mod tests {
 		// 15a8528ae2d9f85886bcc8f0ee24f8a6d0c1ec57ef3dc0bbcc964cbe820a7d95
 		// 9861cae0002869d2f4c65e4a31500ea55d0a2686d44dbdeeedc29e09196a1e99
 
-		let index = 1;
+		let index = 0;
 
 		let proof = tree.proof(leaves[index].as_ref()).unwrap();
 		// for p in proof.iter() {
@@ -364,6 +381,41 @@ mod tests {
 			to_hex_string(&root)
 		);
 		// println!("root: {:?}", to_hex_string(root.as_ref()));
+	}
+
+	#[test]
+	fn test_build() {
+		let mut leaves = vec![
+			hex!("8bc6a1d45d6d4c063a0936e28d702bcc15bd5a2dc8eb65e85006915f191e294c"),
+			hex!("f49675d9423d176411d875b32fd9f272269f0b4a44f52b16d40e575a6c1bea61"),
+			hex!("84f2c42c72ab408b2a49be2c2ccf3f896b05308a0116bce5e93d073189b250f7"),
+			hex!("e6a12952e10e9bd1585df31d4fdf615a41f2a797779bf7c9b55e6facdbde6430"),
+			hex!("02582971c6440ea5aab5d02bc054c6ba3c3a6025790543420e0ca186de30f6cf"),
+			hex!("b7732e74565cc365a9c58f349f11d94700bcee8fc5ba5ba5a508236ca1d300e4"),
+			hex!("79a15a38292be04bf2376a164674d975a7a596afd8d6fe85981a6305c849bb99"),
+			hex!("d6fd2aaabaebf50980d2184e9141ce286111b4f7a39b32bd0ecac22871a4ed14"),
+			hex!("5b2f452cde6154eeb8227eb91d5fb1f2e31d1e16cac741d4ec6ce18593fd6792"),
+			hex!("bbc69bfe1697e473296758de9b9796948a13b6b1ad2b91fcd6118916fdff8dea"),
+			hex!("3389eff6964486b49edb5f54cf9a833aee42298ebe250c094ae3a0857944ba5c"),
+			hex!("5b920af4c112b8bd1c3ef32c2f24f8f3f891fc3c85b8285bbf21cb9a4573b608"),
+		];
+		leaves.sort();
+		let hashes = MerkleTree::build(&KeccakHasher, leaves, true);
+		let root = hashes.last().unwrap()[0].clone();
+		let expect_root = hex!("fb2a038476ab757a1c8bd9bf1b329eb3c2a9e5db7415eaee9acdbbe1ae789aeb");
+		assert_eq!(
+			root,
+			expect_root,
+			"merkle root mismatch, expect: {:?}, got: {:?}",
+			to_hex_string(&expect_root),
+			to_hex_string(&root)
+		);
+		// println!("{:?}",hashes);
+
+		// let pf = MerkleTree::<KeccakHasher>::cp_proof(&hashes, 5, 16, 12);
+		// for p in pf.iter() {
+		// 	println!("proof +: {:?},{}", to_hex_string(p.data.as_ref()), p.position);
+		// }
 	}
 
 	#[test]
