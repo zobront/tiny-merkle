@@ -3,6 +3,8 @@ mod common;
 mod proof {
 
 	use hex_literal::hex;
+	use sha2::Digest;
+
 	use tiny_merkle::*;
 
 	use tiny_keccak::{Hasher, Keccak};
@@ -220,5 +222,40 @@ mod proof {
 				SIMPLE_DATA[i]
 			);
 		}
+	}
+
+	#[allow(dead_code)]
+	fn sha256(data: &[u8]) -> [u8; 32] {
+		let mut hasher = sha2::Sha256::new();
+		let mut hash = [0u8; 32];
+		hasher.update(data);
+		hash.copy_from_slice(hasher.finalize().as_slice());
+		hash
+	}
+
+	#[test]
+	#[ignore]
+	fn test_10w() {
+		let start = std::time::Instant::now();
+		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
+		for i in 0..99_999 {
+			leaf_hashes.push(keccak256(i.to_string().as_bytes()));
+		}
+		// leaf_hashes.sort();
+
+		let tree = MerkleTree::<KeccakHasher>::new(
+			KeccakHasher,
+			leaf_hashes.clone(),
+			Some(MerkleOptions {
+				sort: Some(true),
+				..Default::default()
+			}),
+		);
+		let _root = tree.root();
+		let _root = tree.root();
+		let _root = tree.root();
+
+		let end = start.elapsed();
+		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
 	}
 }

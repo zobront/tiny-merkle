@@ -4,6 +4,7 @@ use crate::hash::Hasher;
 /// we unlikely to ever hit.
 const MAX_TREE_DEPTH: usize = 32;
 
+/// Merkle tree options.
 #[derive(Debug, Clone, Default)]
 pub struct MerkleOptions {
 	pub min_tree_size: Option<usize>,
@@ -49,6 +50,7 @@ impl MerkleOptions {
 	}
 }
 
+/// Merkle tree.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MerkleTree<H>
@@ -64,6 +66,7 @@ where
 	sort: bool,
 }
 
+/// Position of a leaf in the tree.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Position {
 	Left,
@@ -79,6 +82,7 @@ impl std::fmt::Display for Position {
 	}
 }
 
+/// Merkle proof for a leaf.
 #[derive(Debug, Clone)]
 pub struct MerkleProof<H>
 where

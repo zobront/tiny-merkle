@@ -7,7 +7,9 @@
 </h3>
 
 # MerkleTree for Ethereum
-
+[![Build status](https://github.com/chiaos/merkletree/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/chiaos/merkletree/actions/workflows/CI.yml)
+[![Crates.io](https://img.shields.io/crates/v/tiny-merkle)](https://crates.io/crates/tiny-merkle)
+[![Documentation](https://docs.rs/tiny-merkle/badge.svg)](https://docs.rs/tiny-merkle)
 
 
 ## Contents
