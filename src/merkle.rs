@@ -1,5 +1,5 @@
 use crate::hash::Hasher;
-
+use crate::proof::{MerkleProof, Pair, Position};
 /// Maximum supported depth of the tree. 32 corresponds to `2^32` elements in the tree, which
 /// we unlikely to ever hit.
 const MAX_TREE_DEPTH: usize = 32;
@@ -68,32 +68,6 @@ where
 	sort: bool,
 }
 
-/// Position of a leaf in the tree.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Position {
-	Left,
-	Right,
-}
-
-impl std::fmt::Display for Position {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Position::Left => write!(f, "Left"),
-			Position::Right => write!(f, "Right"),
-		}
-	}
-}
-
-/// Merkle proof for a leaf.
-#[derive(Debug, Clone)]
-pub struct MerkleProof<H>
-where
-	H: Hasher,
-{
-	pub data: H::Hash,
-	pub position: Position,
-}
-
 impl<H> MerkleTree<H>
 where
 	H: Hasher,
@@ -158,7 +132,7 @@ where
 		}
 	}
 
-	pub fn proof<T: AsRef<[u8]>>(&self, leaf: T) -> Option<Vec<MerkleProof<H>>> {
+	pub fn proof<T: AsRef<[u8]>>(&self, leaf: T) -> Option<MerkleProof<H>> {
 		if self.layers.is_empty()
 		/* || self.layers[0].is_empty() */
 		{
@@ -175,9 +149,9 @@ where
 		Some(proof)
 	}
 
-	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &[MerkleProof<H>]) -> bool {
+	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &MerkleProof<H>) -> bool {
 		let mut hash = leaf.as_ref().to_vec();
-		for p in proof {
+		for p in proof.proofs.iter() {
 			if self.sort_pairs {
 				let mut v = vec![hash.clone(), p.data.as_ref().to_vec()];
 				v.sort();
@@ -197,7 +171,7 @@ where
 		hash == root.as_ref()
 	}
 
-	fn make_proof(&self, index: usize) -> Vec<MerkleProof<H>> {
+	fn make_proof(&self, index: usize) -> MerkleProof<H> {
 		// let binary_tree_size = hashes.len().next_power_of_two();
 		let depth = tree_depth_by_size(self.high);
 		let mut merkle_path = vec![];
@@ -206,7 +180,7 @@ where
 		for level in 0..depth {
 			let adjacent_idx = index ^ 1;
 			if adjacent_idx < level_len {
-				let p = MerkleProof {
+				let p = Pair {
 					data: self.layers[level][adjacent_idx].clone(),
 					position: if adjacent_idx <= index { Position::Left } else { Position::Right },
 				};
@@ -217,7 +191,7 @@ where
 			level_len = level_len / 2 + level_len % 2;
 		}
 
-		merkle_path
+		MerkleProof { proofs: merkle_path }
 	}
 
 	fn build(hasher: &H, leaves: Vec<H::Hash>, sort_pairs: bool) -> Vec<Vec<H::Hash>> {
@@ -257,7 +231,7 @@ fn tree_depth_by_size(tree_size: usize) -> usize {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
 	use super::*;
 
 	use hex_literal::hex;
@@ -272,7 +246,7 @@ mod tests {
 		hash
 	}
 
-	#[derive(Clone)]
+	#[derive(Clone, Debug)]
 	pub struct KeccakHasher;
 	impl super::Hasher for KeccakHasher {
 		type Hash = [u8; 32];
@@ -290,7 +264,7 @@ mod tests {
 		s
 	}
 
-	impl std::fmt::Display for MerkleProof<KeccakHasher> {
+	impl std::fmt::Display for Pair<KeccakHasher> {
 		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 			write!(f, "data: {}, position: {}", to_hex_string(self.data.as_ref()), self.position)
 		}
@@ -298,8 +272,16 @@ mod tests {
 
 	#[test]
 	fn test_k256() {
-		let n = keccak256(&[]);
-		println!("n: {:?}", to_hex_string(&n));
+		let null = keccak256(&[]);
+		// println!("n: {:?}", to_hex_string(&n));
+		let expect = hex!("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
+		assert_eq!(
+			null,
+			expect,
+			"keccak256 mismatch, expect: {:?}, got: {:?}",
+			to_hex_string(&expect),
+			to_hex_string(&null)
+		);
 	}
 
 	#[test]

@@ -28,7 +28,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-merkle-tree = "0.1"
+tiny-merkle = "0.1"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 ```
 

@@ -70,7 +70,11 @@ mod proof {
 				let tree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
 
 				let proof = tree.proof(keccak256($src.as_bytes()).as_ref()).expect("Failed to generate proof");
-				let p = proof.iter().map(|p| format!("0x{}", hex::encode(p.data))).collect::<Vec<_>>();
+				let p = proof
+					.proofs
+					.iter()
+					.map(|p| format!("0x{}", hex::encode(p.data)))
+					.collect::<Vec<_>>();
 				assert_eq!(p, $proof_exp, "proof mismatch, expected: {:?}, actual: {:?}", $proof_exp, p);
 			}
 		};
@@ -93,7 +97,11 @@ mod proof {
 				);
 
 				let proof = tree.proof(keccak256($src.as_bytes()).as_ref()).expect("Failed to generate proof");
-				let p = proof.iter().map(|p| format!("0x{}", hex::encode(p.data))).collect::<Vec<_>>();
+				let p = proof
+					.proofs
+					.iter()
+					.map(|p| format!("0x{}", hex::encode(p.data)))
+					.collect::<Vec<_>>();
 				assert_eq!(p, $proof_exp, "proof mismatch, expected: {:?}, actual: {:?}", $proof_exp, p);
 			}
 		};

@@ -40,6 +40,7 @@
 
 pub mod hash;
 pub mod merkle;
+pub mod proof;
 
 pub use hash::Hasher;
 pub use merkle::*;
