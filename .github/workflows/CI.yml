@@ -58,6 +58,7 @@ jobs:
           targets: ${{ matrix.target }}
       - run: ${{ matrix.deps }}
       - run: cargo test --target ${{ matrix.target }} --release
+      - run: cargo test --target ${{ matrix.target }} --release --no-default-features
       - run: cargo test --target ${{ matrix.target }} --release --features rayon
 
   # Cross-compiled tests

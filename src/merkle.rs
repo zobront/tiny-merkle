@@ -1,5 +1,7 @@
 use crate::hash::Hasher;
 use crate::proof::{MerkleProof, Pair, Position};
+use alloc::vec;
+use alloc::vec::Vec;
 /// Maximum supported depth of the tree. 32 corresponds to `2^32` elements in the tree, which
 /// we unlikely to ever hit.
 const MAX_TREE_DEPTH: usize = 32;
@@ -78,7 +80,50 @@ impl<H> MerkleTree<H>
 where
 	H: Hasher,
 {
-	pub fn new(leaves: impl IntoIterator<Item = H::Hash>, opts: Option<MerkleOptions>) -> Self {
+	/// Creates a new empty tree.
+	///
+	/// # Example
+	///
+	/// ```
+	/// use tiny_merkle::{MerkleTree,hash::NoopHasher};
+	///
+	/// let tree = MerkleTree::<NoopHasher>::new();
+	/// let root = tree.root();
+	/// let expect_root = vec![];
+	/// assert_eq!(root,expect_root);
+	#[allow(clippy::new_without_default)]
+	pub fn new() -> Self {
+		let layers = Self::build_internal(Vec::new(), false, false);
+		Self {
+			layers,
+			leaves_count: 0,
+			high: 0,
+			hash_leaves: false,
+			sort_leaves: false,
+			sort_pairs: false,
+			sort: false,
+
+			#[cfg(feature = "rayon")]
+			parallel: false,
+		}
+	}
+
+	/// Creates a new tree from the given leaves.
+	/// # Example
+	/// ```
+	/// use tiny_merkle::{MerkleTree,hash::{NoopHasher,Hasher}};
+	/// let leaves = vec!["a", "b", "c", "d", "e", "f"].iter().map(|x| NoopHasher::hash(x.as_bytes())).collect::<Vec<_>>();
+	/// let tree = MerkleTree::<NoopHasher>::from_leaves(leaves, None);
+	/// let root = tree.root();
+	/// let expect_root = vec![0x61, 0x62, 0x63, 0x64, 0x65, 0x66];
+	/// assert_eq!(root,expect_root);
+	/// ```
+	/// # Panics
+	/// Will panic if the constant below is invalid.
+	/// ```
+	/// const MAX_TREE_DEPTH: usize = 32;
+	/// ```
+	pub fn from_leaves(leaves: impl IntoIterator<Item = H::Hash>, opts: Option<MerkleOptions>) -> Self {
 		let (mut hash_leaves, mut sort_leaves, mut sort_pairs, mut sort) = (false, false, false, false);
 		// #[cfg(feature = "rayon")]
 		#[allow(unused_mut)]
@@ -119,7 +164,7 @@ where
 			1 << MAX_TREE_DEPTH
 		);
 		let leaves_count = hashes.len();
-		let layers = Self::build(hashes, sort_pairs, parallel);
+		let layers = Self::build_internal(hashes, sort_pairs, parallel);
 
 		Self {
 			leaves_count,
@@ -138,7 +183,6 @@ where
 	/// Returns the root hash of this tree.
 	/// # Panics
 	/// Will panic if the constant below is invalid.
-
 	pub fn root(&self) -> H::Hash {
 		if self.layers.is_empty() {
 			panic!("merkle root of empty tree is not defined");
@@ -147,6 +191,17 @@ where
 		}
 	}
 
+	/// Returns the proof for the given leaf.
+	/// # Example
+	/// ```
+	/// use tiny_merkle::{MerkleTree,hash::{NoopHasher,Hasher}};
+	/// let leaves = vec!["a", "b", "c", "d", "e", "f"].iter().map(|x| NoopHasher::hash(x.as_bytes())).collect::<Vec<_>>();
+	/// let tree = MerkleTree::<NoopHasher>::from_leaves(leaves, None);
+	/// let root = tree.root();
+	/// let leaf = NoopHasher::hash("a".as_bytes());
+	/// let proof = tree.proof(&leaf).unwrap();
+	/// assert!(tree.verify(&leaf, &root, &proof));
+	/// ```
 	pub fn proof<T: AsRef<[u8]>>(&self, leaf: T) -> Option<MerkleProof<H>> {
 		if self.layers.is_empty()
 		/* || self.layers[0].is_empty() */
@@ -164,6 +219,16 @@ where
 		Some(proof)
 	}
 
+	/// Verifies the given proof against the given leaf and root.
+	/// # Example
+	/// ```
+	/// use tiny_merkle::{MerkleTree,hash::{NoopHasher,Hasher}};
+	/// let leaves = vec!["a", "b", "c", "d", "e", "f"].iter().map(|x| NoopHasher::hash(x.as_bytes())).collect::<Vec<_>>();
+	/// let tree = MerkleTree::<NoopHasher>::from_leaves(leaves, None);
+	/// let root = tree.root();
+	/// let leaf = NoopHasher::hash("a".as_bytes());
+	/// let proof = tree.proof(&leaf).unwrap();
+	/// assert!(tree.verify(&leaf, &root, &proof));
 	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &MerkleProof<H>) -> bool {
 		let mut hash = leaf.as_ref().to_vec();
 		for p in proof.proofs.iter() {
@@ -184,6 +249,26 @@ where
 			}
 		}
 		hash == root.as_ref()
+	}
+
+	/// appends a new leaf to the tree.
+	pub fn append_leaf(&mut self, new_leaf: H::Hash) {
+		// TODO make it more efficient
+		let mut leaves = self.layers[0].clone();
+		leaves.push(new_leaf);
+		self.leaves_count += 1;
+		self.high = leaves.len().next_power_of_two();
+
+		if self.sort_leaves {
+			leaves.sort();
+		}
+
+		#[cfg(feature = "rayon")]
+		let parallel = self.parallel;
+		#[cfg(not(feature = "rayon"))]
+		let parallel = false;
+
+		self.layers = Self::build_internal(leaves, self.sort_pairs, parallel);
 	}
 
 	fn make_proof(&self, index: usize) -> MerkleProof<H> {
@@ -209,7 +294,7 @@ where
 		MerkleProof { proofs: merkle_path }
 	}
 
-	fn build(leaves: Vec<H::Hash>, sort_pairs: bool, parallel: bool) -> Vec<Vec<H::Hash>> {
+	fn build_internal(leaves: Vec<H::Hash>, sort_pairs: bool, parallel: bool) -> Vec<Vec<H::Hash>> {
 		let binary_tree_size = leaves.len().next_power_of_two();
 		let depth = tree_depth_by_size(binary_tree_size);
 		let mut layers = vec![];
@@ -295,8 +380,12 @@ fn tree_depth_by_size(tree_size: usize) -> usize {
 
 #[cfg(test)]
 pub(super) mod tests {
+	use crate::hash::NoopHasher;
+
 	use super::*;
 
+	use alloc::format;
+	use alloc::string::{String, ToString};
 	use hex_literal::hex;
 
 	use tiny_keccak::{Hasher, Keccak};
@@ -327,9 +416,56 @@ pub(super) mod tests {
 		s
 	}
 
-	impl std::fmt::Display for Pair<KeccakHasher> {
-		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	#[cfg(feature = "std")]
+	impl core::fmt::Display for Pair<KeccakHasher> {
+		fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 			write!(f, "data: {}, position: {}", to_hex_string(self.data.as_ref()), self.position)
+		}
+	}
+
+	#[test]
+	fn new_merkletree() {
+		let tree = MerkleTree::<NoopHasher>::new();
+		let root = tree.root();
+		let expect_root = vec![];
+		assert_eq!(
+			root,
+			expect_root,
+			"merkle root mismatch, expect: {:?}, got: {:?}",
+			to_hex_string(&expect_root),
+			to_hex_string(&root)
+		);
+	}
+
+	#[test]
+	fn test_append() {
+		use crate::hash::NoopHasher;
+
+		let null_leaves = vec!["dd".as_bytes().to_vec(), "ee".as_bytes().to_vec()];
+		let mut expect_root = "ddee".as_bytes().to_vec();
+		let mut tree = MerkleTree::<NoopHasher>::from_leaves(null_leaves, None);
+		let root = tree.root();
+
+		assert_eq!(
+			root,
+			expect_root,
+			"merkle root mismatch, expect: {:?}, got: {:?}",
+			to_hex_string(&expect_root),
+			to_hex_string(&root)
+		);
+
+		for i in 0..2_000 {
+			tree.append_leaf(i.to_string().as_bytes().to_vec());
+			let root = tree.root();
+			expect_root.extend(i.to_string().as_bytes());
+			// println!("a root: {:?}", to_hex_string(&root));
+			assert_eq!(
+				root,
+				expect_root,
+				"merkle root mismatch, expect: {:?}, got: {:?}",
+				to_hex_string(&expect_root),
+				to_hex_string(&root)
+			);
 		}
 	}
 
@@ -350,7 +486,7 @@ pub(super) mod tests {
 	#[test]
 	fn test_merkle_root() {
 		let null_leaves = vec![];
-		let tree = MerkleTree::<KeccakHasher>::new(null_leaves, None);
+		let tree = MerkleTree::<KeccakHasher>::from_leaves(null_leaves, None);
 		let root = tree.root();
 		let expect_root = hex!("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
 		assert_eq!(
@@ -376,7 +512,7 @@ pub(super) mod tests {
 			hex!("5b920af4c112b8bd1c3ef32c2f24f8f3f891fc3c85b8285bbf21cb9a4573b608"),
 		];
 
-		let tree = MerkleTree::<KeccakHasher>::new(
+		let tree = MerkleTree::<KeccakHasher>::from_leaves(
 			leaves.clone(),
 			Some(MerkleOptions {
 				sort: Some(true),
@@ -461,9 +597,9 @@ pub(super) mod tests {
 		#[cfg(not(feature = "rayon"))]
 		let parall: bool = false;
 
-		let hashes = MerkleTree::<KeccakHasher>::build(leaves, true, parall);
+		let hashes = MerkleTree::<KeccakHasher>::build_internal(leaves, true, parall);
 
-		let root = hashes.last().unwrap()[0].clone();
+		let root = hashes.last().unwrap()[0];
 		let expect_root = hex!("fb2a038476ab757a1c8bd9bf1b329eb3c2a9e5db7415eaee9acdbbe1ae789aeb");
 		assert_eq!(
 			root,

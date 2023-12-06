@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 /// Hasher is a trait used to provide a hashing algorithm for the library.
 ///
 /// # Example
@@ -31,4 +33,15 @@ pub trait Hasher {
 
 	/// Gets the hash of the byte sequence.
 	fn hash(value: &[u8]) -> Self::Hash;
+}
+
+/// NoopHasher is a hasher that does not hash the input.
+/// It is useful for testing.
+pub struct NoopHasher;
+impl Hasher for NoopHasher {
+	type Hash = Vec<u8>;
+
+	fn hash(value: &[u8]) -> Self::Hash {
+		value.to_vec()
+	}
 }

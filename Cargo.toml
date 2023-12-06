@@ -1,6 +1,6 @@
 [package]
 name = "tiny-merkle"
-version = "0.2.0-beta"
+version = "0.2.0"
 edition = "2021"
 description =  "A tiny merkle tree library for Ethereum"
 license = "MIT"
@@ -16,7 +16,8 @@ categories = ["cryptography", "merkle-tree", "ethereum", "merkle"]
 rayon = "1.8.0"
 
 [features]
-# default = ["rayon"]
+default = ["std"]
+std = []
 rayon = []
 
 [dev-dependencies]

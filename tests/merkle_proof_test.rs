@@ -50,7 +50,7 @@ mod proof {
 	fn merkle_root() {
 		let expected_root_hex = hex!("5c0b53a1f24dbf1280ee00246e83b627fcaa45016b5c291a3f9608e5e2a38c6c");
 		let leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
-		let tree = MerkleTree::<KeccakHasher>::new(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
+		let tree = MerkleTree::<KeccakHasher>::from_leaves(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
 		assert_eq!(
 			tree.root().as_ref(),
 			expected_root_hex,
@@ -68,7 +68,7 @@ mod proof {
 				for i in 0..99_999 {
 					leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 				}
-				let tree = MerkleTree::<KeccakHasher>::new(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
+				let tree = MerkleTree::<KeccakHasher>::from_leaves(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
 
 				let proof = tree.proof(keccak256($src.as_bytes()).as_ref()).expect("Failed to generate proof");
 				let p = proof
@@ -88,7 +88,7 @@ mod proof {
 				for i in 0..99_999 {
 					leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 				}
-				let tree = MerkleTree::<KeccakHasher>::new(
+				let tree = MerkleTree::<KeccakHasher>::from_leaves(
 					leaf_hashes.clone(),
 					Some(MerkleOptions {
 						sort: Some(true),
@@ -212,7 +212,7 @@ mod proof {
 		for i in 0..99_999 {
 			leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 		}
-		let tree = MerkleTree::<KeccakHasher>::new(
+		let tree = MerkleTree::<KeccakHasher>::from_leaves(
 			leaf_hashes.clone(),
 			Some(MerkleOptions {
 				sort: Some(true),
@@ -257,7 +257,7 @@ mod proof {
 		// }
 		// leaf_hashes.sort();
 
-		let tree = MerkleTree::<KeccakHasher>::new(
+		let tree = MerkleTree::<KeccakHasher>::from_leaves(
 			leaf_hashes.clone(),
 			Some(MerkleOptions {
 				sort: Some(true),

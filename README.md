@@ -28,7 +28,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tiny-merkle = "0.1"
+tiny-merkle = "0.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 ```
 
@@ -59,19 +59,9 @@ fn keccak256(data: &[u8]) -> [u8; 32] {
 fn main() {
 	let data_raw = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
 
-	let leaves = data_raw
-		.iter()
-		.map(|s| keccak256(&s.as_bytes()))
-		.collect::<Vec<_>>();
+	let leaves = data_raw.iter().map(|s| keccak256(&s.as_bytes())).collect::<Vec<_>>();
 
-	let tree = MerkleTree::new(
-		KeccakHasher,
-		leaves.clone(),
-		Some(tiny_merkle::MerkleOptions {
-			sort: Some(true),
-			..Default::default()
-		}),
-	);
+	let tree = MerkleTree::<KeccakHasher>::from_leaves(leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
 
 	println!("root: {}", hex::encode(tree.root()));
 

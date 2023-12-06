@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use crate::hash::Hasher;
 
 /// Position of a leaf in the tree.
@@ -7,8 +9,9 @@ pub enum Position {
 	Right,
 }
 
-impl std::fmt::Display for Position {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#[cfg(feature = "std")]
+impl core::fmt::Display for Position {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Position::Left => write!(f, "Left"),
 			Position::Right => write!(f, "Right"),
@@ -35,33 +38,37 @@ where
 	pub proofs: Vec<Pair<H>>,
 }
 
-impl<H> std::fmt::Debug for MerkleProof<H>
+#[cfg(feature = "std")]
+impl<H> core::fmt::Debug for MerkleProof<H>
 where
-	H: Hasher + std::fmt::Debug,
-	H::Hash: std::fmt::Debug,
+	H: Hasher + core::fmt::Debug,
+	H::Hash: core::fmt::Debug,
 {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "MerkleProof {{ proofs: {:?} }}", self.proofs)
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
 	use super::*;
 	use crate::{merkle::tests::KeccakHasher, MerkleTree};
+	use alloc::format;
+	#[allow(unused_imports)]
+	use alloc::vec;
 
 	#[test]
 	fn test_debug() {
-		let leaves = vec!["a", "b", "c", "d", "e", "f"]
+		let leaves = ["a", "b", "c", "d", "e", "f"]
 			.iter()
 			.map(|x| KeccakHasher::hash(x.as_bytes()))
 			.collect::<Vec<_>>();
-		let mtree = MerkleTree::<KeccakHasher>::new(leaves, None);
+		let mtree = MerkleTree::<KeccakHasher>::from_leaves(leaves, None);
 		let _root = mtree.root();
 
 		// verify the proof of the first leaf
 		let leaf = KeccakHasher::hash("a".as_bytes());
-		let proof = mtree.proof(&leaf).unwrap();
+		let proof = mtree.proof(leaf).unwrap();
 		// assert!(mtree.verify(&leaf, &root, &proof));
 		format!("{:?}", proof);
 	}

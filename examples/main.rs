@@ -63,7 +63,7 @@ fn main() {
 		})
 		.collect::<Vec<_>>();
 
-	let tree = MerkleTree::<KeccakHasher>::new(
+	let tree = MerkleTree::<KeccakHasher>::from_leaves(
 		leaves.clone(),
 		Some(MerkleOptions {
 			sort: Some(true),
@@ -73,7 +73,7 @@ fn main() {
 
 	println!("root: {}", hex::encode(tree.root()));
 
-	let proof = tree.proof(&leaves[0]).unwrap();
+	let proof = tree.proof(leaves[0]).unwrap();
 
 	let ok = tree.verify(&leaves[0], &tree.root(), &proof);
 	println!("verify: {}", ok);
@@ -85,7 +85,7 @@ fn main_readme() {
 
 	let leaves = data_raw.iter().map(|s| keccak256(&s.as_bytes())).collect::<Vec<_>>();
 
-	let tree = MerkleTree::<KeccakHasher>::new(leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
+	let tree = MerkleTree::<KeccakHasher>::from_leaves(leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
 
 	println!("root: {}", hex::encode(tree.root()));
 

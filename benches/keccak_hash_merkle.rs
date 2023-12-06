@@ -32,12 +32,12 @@ fn merkle_proof_benchmark(c: &mut Criterion) {
 	.iter()
 	.map(|x| keccak256(x.as_bytes()))
 	.collect::<Vec<_>>();
-	let mtree = MerkleTree::<KeccakHasher>::new(leaves, None);
+	let mtree = MerkleTree::<KeccakHasher>::from_leaves(leaves, None);
 	let root = mtree.root();
 
 	// verify the proof of the first leaf
 	let leaf = keccak256("a".as_bytes());
-	let proof = mtree.proof(&leaf).unwrap();
+	let proof = mtree.proof(leaf).unwrap();
 	assert!(mtree.verify(&leaf, &root, &proof));
 
 	c.bench_function("merkle proof", |b| b.iter(|| mtree.proof(black_box(&leaf))));
