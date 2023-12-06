@@ -1,6 +1,6 @@
 [package]
 name = "tiny-merkle"
-version = "0.1.3"
+version = "0.2.0-beta"
 edition = "2021"
 description =  "A tiny merkle tree library for Ethereum"
 license = "MIT"
@@ -13,8 +13,11 @@ categories = ["cryptography", "merkle-tree", "ethereum", "merkle"]
 
 
 [dependencies]
+rayon = "1.8.0"
 
-
+[features]
+# default = ["rayon"]
+rayon = []
 
 [dev-dependencies]
 tiny-keccak = { version = "2.0.2", features = ["sha3","keccak"] }
@@ -22,6 +25,7 @@ sha2 = "0.10.8"
 hex-literal = "0.4"
 hex = "0.4.3"
 criterion = "0.5.1"
+
 
 [[bench]]
 name = "keccak_hash_merkle"

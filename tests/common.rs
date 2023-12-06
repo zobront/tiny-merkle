@@ -10,7 +10,7 @@ macro_rules! impl_sha2 {
 		pub struct $t;
 		impl Hasher for $t {
 			type Hash = [u8; $size];
-			fn hash(&self, value: &[u8]) -> Self::Hash {
+			fn hash(value: &[u8]) -> Self::Hash {
 				let mut hasher = <$s>::new();
 				let mut hash = [0u8; $size];
 				hasher.update(value);
@@ -38,7 +38,7 @@ fn sha256_root_and_proof() {
 	let leaf_values = ["a", "b", "c", "d", "e", "f"];
 	let expected_root_hex = hex!("1f7379539707bcaea00564168d1d4d626b09b73f8a2a365234c62d763f854da2");
 	let leaf_hashes: Vec<_> = leaf_values.iter().map(|x| sha256(x.as_bytes())).collect();
-	let tree = MerkleTree::<Sha256Hasher>::new(Sha256Hasher, leaf_hashes.clone(), None);
+	let tree = MerkleTree::<Sha256Hasher>::new(leaf_hashes.clone(), None);
 	assert_eq!(tree.root().as_ref(), expected_root_hex);
 
 	for (i, leaf) in leaf_hashes.iter().enumerate() {
@@ -53,7 +53,7 @@ fn sha256_root_and_proof() {
 }
 
 macro_rules! test_sha2_case {
-	($sh:expr,$fn:ident,$root_hex:literal) => {
+	($sh:ident,$fn:ident,$root_hex:literal) => {
 		#[test]
 		fn $fn() {
 			let leaf_values = [
@@ -67,11 +67,11 @@ macro_rules! test_sha2_case {
 			let leaf_hashes: Vec<_> = leaf_values
 				.iter()
 				.map(|x| {
-					let sha = $sh;
-					sha.hash(x.as_bytes())
+					// let sha = $sh;
+					$sh::hash(x.as_bytes())
 				})
 				.collect();
-			let tree = MerkleTree::new($sh, leaf_hashes.clone(), None);
+			let tree = MerkleTree::<$sh>::new(leaf_hashes.clone(), None);
 			let root = tree.root();
 			assert_eq!(root.as_ref(), hex!($root_hex));
 			// println!("root: {:?}", hex::encode(root.as_ref()));

@@ -8,7 +8,7 @@ const MAX_TREE_DEPTH: usize = 32;
 #[derive(Debug, Clone, Default)]
 pub struct MerkleOptions {
 	/// If set, the tree will be padded to this size with zero hashes.
-	pub min_tree_size: Option<usize>,
+	// pub min_tree_size: Option<usize>,
 	/// If set to `true`, the leaves will hashed using the set hashing algorithms.
 	pub hash_leaves: Option<bool>,
 	/// If `true`, the leaves are sorted before building the tree.
@@ -18,16 +18,14 @@ pub struct MerkleOptions {
 
 	/// If `true`, sort_pairs is set to `true` and sort_pairs is set to `true`.
 	pub sort: Option<bool>,
+
+	#[cfg(feature = "rayon")]
+	pub parallel: Option<bool>,
 }
 
 impl MerkleOptions {
 	pub fn new() -> Self {
 		Self::default()
-	}
-
-	pub fn with_min_tree_size(mut self, min_tree_size: usize) -> Self {
-		self.min_tree_size = Some(min_tree_size);
-		self
 	}
 
 	pub fn with_hash_leaves(mut self, hash_leaves: bool) -> Self {
@@ -49,6 +47,12 @@ impl MerkleOptions {
 		self.sort = Some(sort);
 		self
 	}
+
+	#[cfg(feature = "rayon")]
+	pub fn with_parallel(mut self, parallel: bool) -> Self {
+		self.parallel = Some(parallel);
+		self
+	}
 }
 
 /// Merkle tree.
@@ -58,7 +62,6 @@ pub struct MerkleTree<H>
 where
 	H: Hasher,
 {
-	hasher: H,
 	layers: Vec<Vec<H::Hash>>,
 	leaves_count: usize,
 	high: usize,
@@ -66,15 +69,20 @@ where
 	sort_leaves: bool,
 	sort_pairs: bool,
 	sort: bool,
+
+	#[cfg(feature = "rayon")]
+	parallel: bool,
 }
 
 impl<H> MerkleTree<H>
 where
 	H: Hasher,
 {
-	pub fn new(hasher: H, leaves: impl IntoIterator<Item = H::Hash>, opts: Option<MerkleOptions>) -> Self {
+	pub fn new(leaves: impl IntoIterator<Item = H::Hash>, opts: Option<MerkleOptions>) -> Self {
 		let (mut hash_leaves, mut sort_leaves, mut sort_pairs, mut sort) = (false, false, false, false);
-		let mut min_tree_size = None;
+		// #[cfg(feature = "rayon")]
+		#[allow(unused_mut)]
+		let mut parallel = false;
 		if let Some(opts) = opts {
 			hash_leaves = opts.hash_leaves.unwrap_or(false);
 			sort_leaves = opts.sort_leaves.unwrap_or(false);
@@ -84,33 +92,36 @@ where
 				sort_leaves = true;
 				sort_pairs = true;
 			}
-			min_tree_size = opts.min_tree_size;
+
+			#[cfg(feature = "rayon")]
+			{
+				parallel = opts.parallel.unwrap_or(false);
+			}
 		}
 
 		let mut hashes: Vec<_> = leaves
 			.into_iter()
-			.map(|bytes| if hash_leaves { hasher.hash(bytes.as_ref()) } else { bytes })
+			.map(|bytes| if hash_leaves { H::hash(bytes.as_ref()) } else { bytes })
 			.collect();
 
 		if sort_leaves {
 			hashes.sort();
 		}
 
-		let mut high = hashes.len().next_power_of_two();
-		if let Some(min_tree_size) = min_tree_size {
-			assert!(min_tree_size.is_power_of_two(), "tree size must be a power of 2");
-			high = min_tree_size.max(high);
-		}
+		let high = hashes.len().next_power_of_two();
+		// if let Some(min_tree_size) = min_tree_size {
+		// 	assert!(min_tree_size.is_power_of_two(), "tree size must be a power of 2");
+		// 	high = min_tree_size.max(high);
+		// }
 		assert!(
 			tree_depth_by_size(high) <= MAX_TREE_DEPTH,
 			"Tree contains more than {} items; this is not supported",
 			1 << MAX_TREE_DEPTH
 		);
 		let leaves_count = hashes.len();
-		let layers = Self::build(&hasher, hashes, sort_pairs);
+		let layers = Self::build(hashes, sort_pairs, parallel);
 
 		Self {
-			hasher,
 			leaves_count,
 			layers,
 			high,
@@ -118,12 +129,16 @@ where
 			sort_leaves,
 			sort_pairs,
 			sort,
+
+			#[cfg(feature = "rayon")]
+			parallel,
 		}
 	}
 
 	/// Returns the root hash of this tree.
 	/// # Panics
 	/// Will panic if the constant below is invalid.
+
 	pub fn root(&self) -> H::Hash {
 		if self.layers.is_empty() {
 			panic!("merkle root of empty tree is not defined");
@@ -157,15 +172,15 @@ where
 				v.sort();
 				let mut combine = v[0].clone();
 				combine.extend(v[1].iter());
-				hash = self.hasher.hash(&combine).as_ref().to_vec();
+				hash = H::hash(&combine).as_ref().to_vec();
 			} else if p.position == Position::Left {
 				let mut combine = p.data.as_ref().to_vec();
 				combine.extend(hash);
-				hash = self.hasher.hash(combine.as_ref()).as_ref().to_vec();
+				hash = H::hash(combine.as_ref()).as_ref().to_vec();
 			} else {
 				let mut combine = hash.clone();
 				combine.extend(p.data.as_ref());
-				hash = self.hasher.hash(combine.as_ref()).as_ref().to_vec();
+				hash = H::hash(combine.as_ref()).as_ref().to_vec();
 			}
 		}
 		hash == root.as_ref()
@@ -194,7 +209,7 @@ where
 		MerkleProof { proofs: merkle_path }
 	}
 
-	fn build(hasher: &H, leaves: Vec<H::Hash>, sort_pairs: bool) -> Vec<Vec<H::Hash>> {
+	fn build(leaves: Vec<H::Hash>, sort_pairs: bool, parallel: bool) -> Vec<Vec<H::Hash>> {
 		let binary_tree_size = leaves.len().next_power_of_two();
 		let depth = tree_depth_by_size(binary_tree_size);
 		let mut layers = vec![];
@@ -203,15 +218,56 @@ where
 		layers.push(leaves);
 
 		for _level in 0..depth {
-			for i in 0..(level_len / 2) {
-				if sort_pairs {
-					hashes[2 * i..2 * i + 2].sort();
+			if parallel {
+				#[cfg(not(feature = "rayon"))]
+				{
+					for i in 0..(level_len / 2) {
+						if sort_pairs {
+							hashes[2 * i..2 * i + 2].sort();
+						}
+						// combine hashes[2 * i], &hashes[2 * i + 1]
+						let mut combine = hashes[2 * i].as_ref().to_vec();
+						combine.extend(hashes[2 * i + 1].as_ref());
+						hashes[i] = H::hash(combine.as_ref());
+					}
 				}
-				// combine hashes[2 * i], &hashes[2 * i + 1]
-				let mut combine = hashes[2 * i].as_ref().to_vec();
-				combine.extend(hashes[2 * i + 1].as_ref());
-				hashes[i] = hasher.hash(combine.as_ref());
+
+				#[cfg(feature = "rayon")]
+				{
+					use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+					let layar_level = hashes[0..level_len]
+						.chunks(2)
+						.collect::<Vec<_>>()
+						.into_par_iter()
+						.map_with(&hashes, |_src, hash| {
+							if hash.len() == 2 {
+								let mut pair = [hash[0].clone(), hash[1].clone()];
+								if sort_pairs {
+									pair.sort();
+								}
+								let mut combine = pair[0].as_ref().to_vec();
+								combine.extend(pair[1].as_ref());
+								H::hash(combine.as_ref())
+							} else {
+								hash[0].clone()
+							}
+						})
+						.collect::<Vec<_>>();
+
+					hashes[..(level_len / 2)].clone_from_slice(&layar_level[..(level_len / 2)]);
+				}
+			} else {
+				for i in 0..(level_len / 2) {
+					if sort_pairs {
+						hashes[2 * i..2 * i + 2].sort();
+					}
+					// combine hashes[2 * i], &hashes[2 * i + 1]
+					let mut combine = hashes[2 * i].as_ref().to_vec();
+					combine.extend(hashes[2 * i + 1].as_ref());
+					hashes[i] = H::hash(combine.as_ref());
+				}
 			}
+
 			if level_len % 2 == 1 {
 				hashes[level_len / 2] = hashes[level_len - 1].clone();
 			}
@@ -219,8 +275,15 @@ where
 			level_len = level_len / 2 + level_len % 2;
 			layers.push(hashes[..level_len].to_vec());
 		}
-		let root = hashes[0].clone();
-		layers.push(vec![root]);
+
+		// leaves may be empty
+		if hashes.is_empty() {
+			layers.push(vec![H::hash(&[])]);
+		} else {
+			let root = hashes[0].clone();
+			layers.push(vec![root]);
+		}
+
 		layers
 	}
 }
@@ -251,7 +314,7 @@ pub(super) mod tests {
 	impl super::Hasher for KeccakHasher {
 		type Hash = [u8; 32];
 
-		fn hash(&self, value: &[u8]) -> Self::Hash {
+		fn hash(value: &[u8]) -> Self::Hash {
 			keccak256(value)
 		}
 	}
@@ -286,6 +349,18 @@ pub(super) mod tests {
 
 	#[test]
 	fn test_merkle_root() {
+		let null_leaves = vec![];
+		let tree = MerkleTree::<KeccakHasher>::new(null_leaves, None);
+		let root = tree.root();
+		let expect_root = hex!("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
+		assert_eq!(
+			root,
+			expect_root,
+			"merkle root mismatch, expect: {:?}, got: {:?}",
+			to_hex_string(&expect_root),
+			to_hex_string(&root)
+		);
+
 		let leaves = vec![
 			hex!("8bc6a1d45d6d4c063a0936e28d702bcc15bd5a2dc8eb65e85006915f191e294c"),
 			hex!("f49675d9423d176411d875b32fd9f272269f0b4a44f52b16d40e575a6c1bea61"),
@@ -301,15 +376,13 @@ pub(super) mod tests {
 			hex!("5b920af4c112b8bd1c3ef32c2f24f8f3f891fc3c85b8285bbf21cb9a4573b608"),
 		];
 
-		let tree = MerkleTree::new(
-			KeccakHasher,
+		let tree = MerkleTree::<KeccakHasher>::new(
 			leaves.clone(),
 			Some(MerkleOptions {
-				min_tree_size: None,
-				hash_leaves: None,
-				sort_leaves: None,
-				sort_pairs: None,
 				sort: Some(true),
+				#[cfg(feature = "rayon")]
+				parallel: Some(true),
+				..Default::default()
 			}),
 		);
 
@@ -382,7 +455,14 @@ pub(super) mod tests {
 			hex!("5b920af4c112b8bd1c3ef32c2f24f8f3f891fc3c85b8285bbf21cb9a4573b608"),
 		];
 		leaves.sort();
-		let hashes = MerkleTree::build(&KeccakHasher, leaves, true);
+
+		#[cfg(feature = "rayon")]
+		let parall: bool = true;
+		#[cfg(not(feature = "rayon"))]
+		let parall: bool = false;
+
+		let hashes = MerkleTree::<KeccakHasher>::build(leaves, true, parall);
+
 		let root = hashes.last().unwrap()[0].clone();
 		let expect_root = hex!("fb2a038476ab757a1c8bd9bf1b329eb3c2a9e5db7415eaee9acdbbe1ae789aeb");
 		assert_eq!(

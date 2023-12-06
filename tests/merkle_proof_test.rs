@@ -3,6 +3,7 @@ mod common;
 mod proof {
 
 	use hex_literal::hex;
+	use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 	use sha2::Digest;
 
 	use tiny_merkle::*;
@@ -22,7 +23,7 @@ mod proof {
 	impl tiny_merkle::Hasher for KeccakHasher {
 		type Hash = [u8; 32];
 
-		fn hash(&self, value: &[u8]) -> Self::Hash {
+		fn hash(value: &[u8]) -> Self::Hash {
 			keccak256(value)
 		}
 	}
@@ -49,7 +50,7 @@ mod proof {
 	fn merkle_root() {
 		let expected_root_hex = hex!("5c0b53a1f24dbf1280ee00246e83b627fcaa45016b5c291a3f9608e5e2a38c6c");
 		let leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
-		let tree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
+		let tree = MerkleTree::<KeccakHasher>::new(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
 		assert_eq!(
 			tree.root().as_ref(),
 			expected_root_hex,
@@ -67,7 +68,7 @@ mod proof {
 				for i in 0..99_999 {
 					leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 				}
-				let tree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
+				let tree = MerkleTree::<KeccakHasher>::new(leaf_hashes.clone(), Some(MerkleOptions::new().with_sort(true)));
 
 				let proof = tree.proof(keccak256($src.as_bytes()).as_ref()).expect("Failed to generate proof");
 				let p = proof
@@ -88,7 +89,6 @@ mod proof {
 					leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 				}
 				let tree = MerkleTree::<KeccakHasher>::new(
-					KeccakHasher,
 					leaf_hashes.clone(),
 					Some(MerkleOptions {
 						sort: Some(true),
@@ -213,7 +213,6 @@ mod proof {
 			leaf_hashes.push(keccak256(i.to_string().as_bytes()));
 		}
 		let tree = MerkleTree::<KeccakHasher>::new(
-			KeccakHasher,
 			leaf_hashes.clone(),
 			Some(MerkleOptions {
 				sort: Some(true),
@@ -246,16 +245,24 @@ mod proof {
 	fn test_10w() {
 		let start = std::time::Instant::now();
 		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
-		for i in 0..99_999 {
-			leaf_hashes.push(keccak256(i.to_string().as_bytes()));
-		}
+		let hashes = (0..100_000)
+			.collect::<Vec<_>>()
+			.into_par_iter()
+			.map(|x| keccak256(x.to_string().as_bytes()))
+			.collect::<Vec<_>>();
+		leaf_hashes.extend(hashes);
+
+		// for i in 0..100_000 {
+		// 	leaf_hashes.push(keccak256(i.to_string().as_bytes()));
+		// }
 		// leaf_hashes.sort();
 
 		let tree = MerkleTree::<KeccakHasher>::new(
-			KeccakHasher,
 			leaf_hashes.clone(),
 			Some(MerkleOptions {
 				sort: Some(true),
+				#[cfg(feature = "rayon")]
+				parallel: Some(true),
 				..Default::default()
 			}),
 		);
@@ -265,5 +272,47 @@ mod proof {
 
 		let end = start.elapsed();
 		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
+	}
+
+	#[test]
+	#[ignore]
+	fn test_rayon() {
+		let start = std::time::Instant::now();
+		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
+		for i in 0..100_000 {
+			leaf_hashes.push(keccak256(i.to_string().as_bytes()));
+		}
+		let end = start.elapsed();
+		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
+
+		use rayon::prelude::*;
+		let start = std::time::Instant::now();
+		let _leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
+		let _l = [0; 100_000].par_iter().map(|i| (keccak256(i.to_string().as_bytes()))).collect::<Vec<_>>();
+		let end = start.elapsed();
+		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
+
+		let start = std::time::Instant::now();
+		let layer_n = leaf_hashes
+			.chunks(2)
+			.collect::<Vec<_>>()
+			.into_par_iter()
+			.map_with(&leaf_hashes, |_x, y| {
+				// println!("{:?}", x);
+				if y.len() == 1 {
+					return y[0];
+				}
+				let mut cy = y.to_vec();
+				cy.sort();
+				let mut data = cy[0].to_vec();
+				data.extend(cy[1].to_vec());
+				keccak256(&data)
+				// x[0] = keccak256(y[0].as_ref());
+			})
+			.collect::<Vec<_>>();
+		let end = start.elapsed();
+		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
+
+		println!("{:?}", layer_n.len());
 	}
 }

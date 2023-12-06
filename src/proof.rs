@@ -54,13 +54,13 @@ mod tests {
 	fn test_debug() {
 		let leaves = vec!["a", "b", "c", "d", "e", "f"]
 			.iter()
-			.map(|x| KeccakHasher.hash(x.as_bytes()))
+			.map(|x| KeccakHasher::hash(x.as_bytes()))
 			.collect::<Vec<_>>();
-		let mtree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
+		let mtree = MerkleTree::<KeccakHasher>::new(leaves, None);
 		let _root = mtree.root();
 
 		// verify the proof of the first leaf
-		let leaf = KeccakHasher.hash("a".as_bytes());
+		let leaf = KeccakHasher::hash("a".as_bytes());
 		let proof = mtree.proof(&leaf).unwrap();
 		// assert!(mtree.verify(&leaf, &root, &proof));
 		format!("{:?}", proof);

@@ -43,7 +43,7 @@ pub struct KeccakHasher;
 impl tiny_merkle::Hasher for KeccakHasher {
 	type Hash = [u8; 32];
 
-	fn hash(&self, value: &[u8]) -> Self::Hash {
+	fn hash(value: &[u8]) -> Self::Hash {
 		keccak256(value)
 	}
 }

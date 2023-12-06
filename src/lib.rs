@@ -14,7 +14,7 @@
 //! impl tiny_merkle::Hasher for KeccakHasher {
 //!     type Hash = [u8; 32];
 //!
-//!     fn hash(&self, value: &[u8]) -> Self::Hash {
+//!     fn hash(value: &[u8]) -> Self::Hash {
 //!         keccak256(value)
 //!     }
 //! }
@@ -28,7 +28,7 @@
 //! }
 //!
 //! let leaves = vec!["a", "b", "c", "d", "e", "f"].iter().map(|x| keccak256(x.as_bytes())).collect::<Vec<_>>();
-//! let mtree = tiny_merkle::MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
+//! let mtree = tiny_merkle::MerkleTree::<KeccakHasher>::new(leaves, None);
 //! let root = mtree.root();
 //!
 //! // verify the proof of the first leaf

@@ -9,7 +9,7 @@ pub struct KeccakHasher;
 impl tiny_merkle::Hasher for KeccakHasher {
 	type Hash = [u8; 32];
 
-	fn hash(&self, value: &[u8]) -> Self::Hash {
+	fn hash(value: &[u8]) -> Self::Hash {
 		keccak256(value)
 	}
 }
@@ -32,7 +32,7 @@ fn merkle_proof_benchmark(c: &mut Criterion) {
 	.iter()
 	.map(|x| keccak256(x.as_bytes()))
 	.collect::<Vec<_>>();
-	let mtree = MerkleTree::<KeccakHasher>::new(KeccakHasher, leaves, None);
+	let mtree = MerkleTree::<KeccakHasher>::new(leaves, None);
 	let root = mtree.root();
 
 	// verify the proof of the first leaf

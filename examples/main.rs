@@ -6,7 +6,7 @@ pub struct KeccakHasher;
 impl tiny_merkle::Hasher for KeccakHasher {
 	type Hash = [u8; 32];
 
-	fn hash(&self, value: &[u8]) -> Self::Hash {
+	fn hash(value: &[u8]) -> Self::Hash {
 		keccak256(value)
 	}
 }
@@ -63,8 +63,7 @@ fn main() {
 		})
 		.collect::<Vec<_>>();
 
-	let tree = MerkleTree::new(
-		KeccakHasher,
+	let tree = MerkleTree::<KeccakHasher>::new(
 		leaves.clone(),
 		Some(MerkleOptions {
 			sort: Some(true),
@@ -86,7 +85,7 @@ fn main_readme() {
 
 	let leaves = data_raw.iter().map(|s| keccak256(&s.as_bytes())).collect::<Vec<_>>();
 
-	let tree = MerkleTree::new(KeccakHasher, leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
+	let tree = MerkleTree::<KeccakHasher>::new(leaves.clone(), Some(tiny_merkle::MerkleOptions::default().with_sort(true)));
 
 	println!("root: {}", hex::encode(tree.root()));
 
