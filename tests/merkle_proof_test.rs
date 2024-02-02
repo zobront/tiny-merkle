@@ -3,6 +3,7 @@ mod common;
 mod proof {
 
 	use hex_literal::hex;
+	#[cfg(feature = "rayon")]
 	use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 	use sha2::Digest;
 
@@ -206,7 +207,7 @@ mod proof {
 	);
 
 	#[test]
-	#[ignore]
+	// #[ignore]
 	fn keccak256_proof() {
 		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
 		for i in 0..99_999 {
@@ -240,8 +241,9 @@ mod proof {
 		hash
 	}
 
+	#[cfg(feature = "rayon")]
 	#[test]
-	#[ignore]
+	// #[ignore]
 	fn test_10w() {
 		let start = std::time::Instant::now();
 		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();
@@ -274,8 +276,9 @@ mod proof {
 		println!("{}.{:03} s", end.as_secs(), end.subsec_millis());
 	}
 
+	#[cfg(feature = "rayon")]
 	#[test]
-	#[ignore]
+	// #[ignore]
 	fn test_rayon() {
 		let start = std::time::Instant::now();
 		let mut leaf_hashes: Vec<_> = SIMPLE_DATA.iter().map(|x| keccak256(x.as_bytes())).collect();

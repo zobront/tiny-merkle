@@ -1,8 +1,8 @@
 [package]
 name = "tiny-merkle"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description =  "A tiny merkle tree library for Ethereum"
+description = "A tiny merkle tree library for Ethereum"
 license = "MIT"
 authors = ["tiny-merkle Developers"]
 repository = "https://github.com/chiaos/merkletree"
@@ -11,17 +11,21 @@ resolver = "2"
 categories = ["cryptography", "merkle-tree", "ethereum", "merkle"]
 
 
-
 [dependencies]
-rayon = "1.8.0"
+rayon = { version = "1.8.0", optional = true }
 
 [features]
 default = ["std"]
+
+# Option (enabled by default): without "std" tiny-merkle uses libcore; this option
+# enables functionality expected to be available on a standard platform.
 std = []
-rayon = []
+
+# Option: enable rayon
+rayon = ["dep:rayon"]
 
 [dev-dependencies]
-tiny-keccak = { version = "2.0.2", features = ["sha3","keccak"] }
+tiny-keccak = { version = "2.0.2", features = ["sha3", "keccak"] }
 sha2 = "0.10.8"
 hex-literal = "0.4"
 hex = "0.4.3"
