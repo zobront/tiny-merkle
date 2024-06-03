@@ -255,6 +255,23 @@ where
 		hash
 	}
 
+    pub fn get_root_from_proof_unsorted<T: AsRef<[u8]>>(leaf: T, proof: &MerkleProof<H>) -> Vec<u8> {
+        let mut hash = leaf.as_ref().to_vec();
+        for p in proof.proofs.iter() {
+            if p.position == Position::Left {
+                let mut combine = p.data.as_ref().to_vec();
+                combine.extend(hash);
+                hash = H::hash(combine.as_ref()).as_ref().to_vec();
+            } else {
+                let mut combine = hash.clone();
+                combine.extend(p.data.as_ref());
+                hash = H::hash(combine.as_ref()).as_ref().to_vec();
+            }
+        }
+
+        hash
+    }
+
 	/// appends a new leaf to the tree.
 	pub fn append_leaf(&mut self, new_leaf: H::Hash) {
 		// TODO make it more efficient
