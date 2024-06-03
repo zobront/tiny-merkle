@@ -160,8 +160,7 @@ where
 		// }
 		assert!(
 			tree_depth_by_size(high) <= MAX_TREE_DEPTH,
-			"Tree contains more than {} items; this is not supported",
-			1 << MAX_TREE_DEPTH
+			"Tree contains more items than supported"
 		);
 		let leaves_count = hashes.len();
 		let layers = Self::build_internal(hashes, sort_pairs, parallel);

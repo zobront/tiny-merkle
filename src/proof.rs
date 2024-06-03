@@ -1,9 +1,10 @@
 use alloc::vec::Vec;
 
 use crate::hash::Hasher;
+use serde::{Serialize, Deserialize};
 
 /// Position of a leaf in the tree.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Position {
 	Left,
 	Right,
@@ -20,7 +21,7 @@ impl core::fmt::Display for Position {
 }
 
 /// pair of hash and position
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pair<H>
 where
 	H: Hasher,
@@ -30,7 +31,7 @@ where
 }
 
 /// Merkle proof for a leaf.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MerkleProof<H>
 where
 	H: Hasher,

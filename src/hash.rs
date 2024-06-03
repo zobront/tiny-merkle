@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use serde::{Serialize, Deserialize};
 
 /// Hasher is a trait used to provide a hashing algorithm for the library.
 ///
@@ -26,7 +27,7 @@ use alloc::vec::Vec;
 /// ```
 pub trait Hasher {
 	#[cfg(not(feature = "rayon"))]
-	type Hash: AsRef<[u8]> + Clone + Ord;
+	type Hash: AsRef<[u8]> + Clone + Ord + Serialize + for<'a> Deserialize<'a>;
 
 	#[cfg(feature = "rayon")]
 	type Hash: AsRef<[u8]> + Clone + Ord + Send + Sync;
