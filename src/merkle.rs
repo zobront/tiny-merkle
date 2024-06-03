@@ -230,6 +230,10 @@ where
 	/// let proof = tree.proof(&leaf).unwrap();
 	/// assert!(tree.verify(&leaf, &root, &proof));
 	pub fn verify<T: AsRef<[u8]>>(&self, leaf: T, root: T, proof: &MerkleProof<H>) -> bool {
+		self.get_root_from_proof(leaf, proof) == root.as_ref()
+	}
+
+	pub fn get_root_from_proof<T: AsRef<[u8]>>(&self, leaf: T, proof: &MerkleProof<H>) -> Vec<u8> {
 		let mut hash = leaf.as_ref().to_vec();
 		for p in proof.proofs.iter() {
 			if self.sort_pairs {
@@ -248,7 +252,8 @@ where
 				hash = H::hash(combine.as_ref()).as_ref().to_vec();
 			}
 		}
-		hash == root.as_ref()
+
+		hash
 	}
 
 	/// appends a new leaf to the tree.
@@ -271,7 +276,7 @@ where
 		self.layers = Self::build_internal(leaves, self.sort_pairs, parallel);
 	}
 
-	fn make_proof(&self, index: usize) -> MerkleProof<H> {
+	pub fn make_proof(&self, index: usize) -> MerkleProof<H> {
 		// let binary_tree_size = hashes.len().next_power_of_two();
 		let depth = tree_depth_by_size(self.high);
 		let mut merkle_path = vec![];
